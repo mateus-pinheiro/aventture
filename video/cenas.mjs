@@ -68,10 +68,10 @@ async function abrir(url, { video = false, semUI = false, giro = 0, viewport = H
   };
 }
 
-// Versão leve para o site (<video autoplay muted loop>): 960px, sem áudio, mais o primeiro quadro como poster.
-function web(nome, { duracao = 10 } = {}) {
-  ffmpeg('-i', `${VIDEOS}/${nome}.mp4`, '-t', String(duracao), '-an', '-vf', 'scale=960:-2:flags=lanczos',
-    '-c:v', 'libx264', '-crf', '28', '-preset', 'slow', '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
+// Versão leve para o site (<video autoplay muted loop>): sem áudio, mais o primeiro quadro como poster.
+function web(nome, { duracao = 10, largura = 960, crf = 28 } = {}) {
+  ffmpeg('-i', `${VIDEOS}/${nome}.mp4`, '-t', String(duracao), '-an', '-vf', `scale=${largura}:-2:flags=lanczos`,
+    '-c:v', 'libx264', '-crf', String(crf), '-preset', 'slow', '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
     `${CAPTURAS}/${nome}.mp4`);
   ffmpeg('-i', `${CAPTURAS}/${nome}.mp4`, '-frames:v', '1', '-q:v', '4', `${CAPTURAS}/${nome}.jpg`);
 }
@@ -154,14 +154,22 @@ const cenas = {
     web('passeio-pelo-lazer', { duracao: paradas.length * 3.5 });
   },
 
-  // Screenshot 21:9 da maquete do Calabasas, sem interface.
+  // Maquete do Calabasas girando, 21:9, um pouco mais perto que o enquadramento inicial, sem interface.
   async calabasas() {
-    const s = await abrir(CALABASAS, { semUI: true, viewport: { width: 1680, height: 720 }, escala: 2 });
-    await s.page.waitForTimeout(3000);
-    await s.page.screenshot({ path: `${VIDEOS}/maquete-do-calabasas.png` });
-    await s.fechar();
-    ffmpeg('-i', `${VIDEOS}/maquete-do-calabasas.png`, '-vf', 'scale=2400:-1:flags=lanczos', '-q:v', '3',
-      `${CAPTURAS}/maquete-do-calabasas.jpg`);
+    const viewport = { width: 1680, height: 720 };
+    const s = await abrir(CALABASAS, { video: true, semUI: true, giro: 0.4, viewport });
+    const { page } = s;
+    await page.mouse.move(viewport.width / 2, viewport.height / 2);
+    for (let i = 0; i < 3; i++) {
+      await page.mouse.wheel(0, -100);
+      await page.waitForTimeout(120);
+    }
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(1500);
+    s.iniciar();
+    await page.waitForTimeout(30000);
+    await s.fechar('maquete-do-calabasas', 30);
+    web('maquete-do-calabasas', { duracao: 30, largura: 1440, crf: 30 });
   },
 };
 
